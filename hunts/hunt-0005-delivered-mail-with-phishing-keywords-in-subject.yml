@@ -1,0 +1,32 @@
+id: HUNT-0005
+name: Delivered mail with phishing keywords in the subject
+kind: hunt
+platform: defender-kql
+status: prod
+severity: informational
+author: itamarmalkaz
+created: '2026-10-20'
+description: >-
+  Delivered external mail whose subject matches a community keyword list (invoice, password, verify, urgent ...).
+  Low precision by design — a hunt, not a detection — used after a campaign is spotted to find its siblings.
+  The keyword list is pulled from a public repository at query time; pin a commit when you depend on it.
+attack:
+  tactics: [TA0001]
+  techniques: [T1566]
+data_sources:
+  - EmailEvents
+query: |
+  let own = dynamic([${ORG_DOMAINS}]);
+  let SuspiciousKeywords = externaldata(Keywords: string)[@"https://raw.githubusercontent.com/cyb3rmik3/Hunting-Lists/main/phishing-keywords.csv"] with (format="csv", ignoreFirstRecord=True);
+  let Timeframe = 2d;
+  EmailEvents
+  | where Timestamp > ago(Timeframe)
+  | where Subject has_any (SuspiciousKeywords)
+  | where DeliveryAction == "Delivered"
+  | where SenderFromDomain !in (own)
+  | project Timestamp, Subject, SenderMailFromAddress, SenderFromAddress, SenderDisplayName, SenderMailFromDomain, SenderFromDomain,
+            SenderIPv4, AttachmentCount, UrlCount, LatestDeliveryAction, DeliveryAction, DeliveryLocation
+  | sort by Timestamp desc
+references:
+  - https://github.com/cyb3rmik3/Hunting-Lists
+tags: [email, keywords]

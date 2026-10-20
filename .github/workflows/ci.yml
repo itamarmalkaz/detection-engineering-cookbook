@@ -1,0 +1,50 @@
+name: detection-ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  gate:
+    name: schema · lint · logic tests · tooling tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12", cache: pip}
+      - run: pip install -r requirements.txt
+      - name: Validate every detection and hunt
+        run: python tools/validate.py
+      - name: Tooling tests
+        run: python -m pytest -q
+
+  coverage:
+    name: ATT&CK coverage artefacts
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: ${{ github.head_ref || github.ref_name }}}
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12", cache: pip}
+      - run: pip install -r requirements.txt
+      - name: Regenerate coverage, gaps and the Navigator layer
+        run: python tools/coverage.py
+      - name: Render Sentinel parameters from prod rules
+        run: python tools/sentinel_deploy.py render
+      - name: Publish as workflow artefact
+        uses: actions/upload-artifact@v4
+        with: {name: attack-coverage, path: coverage/}
+      - name: Commit regenerated artefacts (main only)
+        if: github.event_name == 'push'
+        run: |
+          git config user.name "detection-ci"; git config user.email "ci@users.noreply.github.com"
+          git add coverage infra/sentinel/rules.generated.json
+          git diff --cached --quiet || git commit -m "ci: regenerate ATT&CK coverage and Sentinel parameters" && git push
+      - name: Coverage summary
+        run: |
+          { echo '## ATT&CK coverage'; sed -n '3,4p' coverage/coverage.md; echo; tail -n 2 coverage/gaps.md; } >> "$GITHUB_STEP_SUMMARY"

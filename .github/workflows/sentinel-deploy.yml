@@ -1,0 +1,52 @@
+name: sentinel-deploy
+
+# Prod `sentinel-kql` rules -> Microsoft Sentinel scheduled analytics rules, via Bicep.
+# Pull requests get a what-if (no change). A push to main deploys, but only inside the `sentinel-prod`
+# environment, which requires a reviewer approval in the repository settings. Secrets: an OIDC federated
+# credential for the deploying identity (no client secret stored in GitHub).
+on:
+  pull_request:
+    paths: [detections/**, infra/sentinel/**, tools/sentinel_deploy.py]
+  push:
+    branches: [main]
+    paths: [detections/**, infra/sentinel/**]
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  RG: ${{ vars.SENTINEL_RESOURCE_GROUP }}
+  WS: ${{ vars.SENTINEL_WORKSPACE }}
+
+jobs:
+  what-if:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -r requirements.txt && python tools/sentinel_deploy.py render
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - run: az deployment group what-if -g "$RG" -f infra/sentinel/main.bicep -p @infra/sentinel/rules.generated.json -p workspaceName="$WS"
+
+  deploy:
+    if: github.event_name == 'push'
+    environment: sentinel-prod
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -r requirements.txt && python tools/sentinel_deploy.py render
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - run: az deployment group create -g "$RG" -f infra/sentinel/main.bicep -p @infra/sentinel/rules.generated.json -p workspaceName="$WS"

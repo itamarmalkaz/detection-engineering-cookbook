@@ -1,0 +1,28 @@
+id: HUNT-0001
+name: Mail-protection verdicts that still reached mailboxes
+kind: hunt
+platform: defender-kql
+status: prod
+severity: informational
+author: itamarmalkaz
+created: '2026-10-20'
+description: >-
+  Weekly look at messages the mail protection stack classified as phish (reputation, detonation, spoof,
+  impersonation, fingerprint) that were nevertheless delivered somewhere other than Quarantine. The gap between
+  "the vendor knows" and "the user is protected" is where campaigns succeed; this hunt measures it and feeds
+  the campaign-containment playbook.
+attack:
+  tactics: [TA0001]
+  techniques: [T1566.001, T1566.002]
+data_sources:
+  - EmailEvents (Defender for Office 365)
+query: |
+  EmailEvents
+  | where Timestamp > ago(7d)
+  | where isnotempty(DetectionMethods)
+  | extend MDO = parse_json(DetectionMethods)
+  | where isnotempty(MDO.Phish)
+  | where DeliveryLocation != "Quarantine"
+  | extend Sender = strcat(SenderFromAddress, ", ", SenderIPv4)
+  | project Timestamp, NetworkMessageId, Subject, Sender, RecipientEmailAddress, DeliveryLocation, Phish = MDO.Phish
+tags: [email, mdo, weekly]

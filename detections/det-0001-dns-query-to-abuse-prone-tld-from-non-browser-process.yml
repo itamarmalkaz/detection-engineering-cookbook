@@ -1,0 +1,71 @@
+id: DET-0001
+name: DNS query to abuse-prone TLD from a non-browser process
+kind: detection
+platform: xsiam-xql
+status: qa
+severity: medium
+author: itamarmalkaz
+created: '2026-10-20'
+description: >-
+  A process that is not a browser, the resolver service or the DNS server resolves a name under a TLD that is
+  cheap and frequently abused (xyz, top, click, tk, ...). Browsers resolve those all day; a script host, an Office
+  binary or an unsigned executable doing it is worth a look. The process exclusion list is the tuning knob — never
+  the TLD list.
+attack:
+  tactics: [TA0011]
+  techniques: [T1071.004, T1568.002]
+data_sources:
+  - xdm.network.dns (endpoint agent)
+schedule: {frequency: 15m, lookback: 15m}
+query: |
+  datamodel dataset in (xdr_data)
+  | filter xdm.network.dns.dns_question.name contains "."
+  | alter domain = rtrim(xdm.network.dns.dns_question.name, ".")
+  | alter tld = arrayindex(split(domain, "."), -1)
+  | filter tld in ("xyz", "ru", "top", "click", "fun", "online", "shop", "site", "store", "gq", "tk", "ml", "cf", "pw")
+  | filter xdm.source.process.executable.path != null
+  | filter not xdm.source.process.executable.path in (
+      "C:\Windows\System32\svchost.exe", "C:\Windows\System32\dns.exe",
+      "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe", "C:\Program Files\Google\Chrome\Application\chrome.exe",
+      "C:\Program Files\Mozilla Firefox\firefox.exe",
+      "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe", "C:\Program Files\Microsoft\Edge\Application\msedge.exe")
+  | fields _time, xdm.network.dns.dns_question.name, tld, xdm.source.process.executable.path, xdm.source.process.command_line,
+           xdm.source.user.username, xdm.source.host.hostname, xdm.source.ipv4, xdm.target.ipv4, xdm.target.port
+  | sort desc _time
+false_positives:
+  - Update agents of niche software resolving vendor CDNs under .top/.shop — add the signed executable to the exclusion list.
+response:
+  playbook: playbooks/explain-web-alert-via-referer.md
+  actions: [find the parent/referer, reputation of the domain, block the domain when nothing explains it]
+validation:
+  method: unit
+# Portable mirror of the query. CI evaluates it against the sample events below (tools/evaluate.py).
+logic:
+  all:
+    - field: dns.tld
+      in: [xyz, ru, top, click, fun, online, shop, site, store, gq, tk, ml, cf, pw]
+    - field: process.path
+      exists: true
+    - field: process.path
+      not_in:
+        - C:\Windows\System32\svchost.exe
+        - C:\Windows\System32\dns.exe
+        - C:\Program Files (x86)\Google\Chrome\Application\chrome.exe
+        - C:\Program Files\Google\Chrome\Application\chrome.exe
+        - C:\Program Files\Mozilla Firefox\firefox.exe
+        - C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
+        - C:\Program Files\Microsoft\Edge\Application\msedge.exe
+tests:
+  - name: script host resolves .top
+    event: {dns: {name: cdn-update.top, tld: top}, process: {path: C:\Windows\System32\wscript.exe}}
+    expect: true
+  - name: chrome resolves .xyz
+    event: {dns: {name: shop.xyz, tld: xyz}, process: {path: C:\Program Files\Google\Chrome\Application\chrome.exe}}
+    expect: false
+  - name: script host resolves .com
+    event: {dns: {name: update.example.com, tld: com}, process: {path: C:\Windows\System32\wscript.exe}}
+    expect: false
+  - name: no process path on the event
+    event: {dns: {name: x.tk, tld: tk}}
+    expect: false
+tags: [dns, c2, endpoint]

@@ -1,0 +1,51 @@
+# Copy to detections/det-NNNN-short-name.yml (or hunts/hunt-NNNN-...). Every field is checked by tools/validate.py;
+# run `make check` before you push. Lines starting with # are guidance — delete them when done.
+
+id: DET-0000                      # DET-NNNN for detections, HUNT-NNNN for hunts; file name starts with the id (lower case)
+name: Short, specific, no vendor name first
+kind: detection                   # detection | hunt
+platform: xsiam-xql               # xsiam-xql | sentinel-kql | defender-kql
+status: draft                     # draft -> qa -> prod (one step at a time, via tools/promote.py) | retired
+severity: medium                  # informational | low | medium | high | critical
+author: your-handle
+created: '2026-01-01'
+description: >-
+  What the behaviour is, why it matters, and what the tuning knob is (which list, which exclusion). At least 40
+  characters; write it for the analyst who gets the alert at 03:00.
+attack:
+  tactics: [TA0011]               # must contain at least one tactic of every technique listed below
+  techniques: [T1071.004]         # ids must exist in data/attack-techniques.json (refresh with tools/attack_refresh.py)
+data_sources:
+  - xdm.network.dns (endpoint agent)
+schedule: {frequency: 15m, lookback: 15m}      # detections only; rendered into Sentinel as ISO durations
+query: |
+  datamodel dataset in (xdr_data)
+  | filter ...
+  # Never put a literal organisation domain, address or IP in a query: use ${ORG_DOMAINS}, ${JUMP_HOSTS} ... (profile variables).
+  # Lint refuses `| limit` / `| take` in detections.
+false_positives:
+  - Who legitimately does this, and how you exclude them without weakening the rule.
+response:
+  playbook: playbooks/fallback-investigation.md   # the recipe the alert hands off to
+  actions: [what the first responder does]
+validation:
+  method: unit                    # unit = logic + tests below are run in CI; manual = aggregate query (needs `reason`,
+                                  # and `lab_run: 'YYYY-MM-DD'` before it can reach prod)
+logic:                            # Sigma-style mirror of the query; see tools/evaluate.py for operators
+  all:
+    - field: dns.tld
+      in: [xyz, top]
+    - field: process.path
+      exists: true
+tests:                            # at least one positive and one negative sample event
+  - name: suspicious case
+    event: {dns: {tld: top}, process: {path: C:\Windows\System32\wscript.exe}}
+    expect: true
+  - name: benign case
+    event: {dns: {tld: com}, process: {path: C:\Windows\System32\wscript.exe}}
+    expect: false
+simulation:                       # required for prod: how the SOC proves the rule fires (BAS scenario / lab exercise)
+  bas_scenario: name of the scenario in your BAS platform
+  notes: anything the person running it must know
+references: []
+tags: [dns, endpoint]

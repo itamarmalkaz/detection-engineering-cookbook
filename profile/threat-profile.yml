@@ -1,0 +1,57 @@
+# Who targets us, and therefore what *should* be covered. tools/coverage.py measures the detection set
+# against this file and writes coverage/gaps.md. Edit it to match your organisation; everything below is a
+# placeholder profile for a defence/aerospace manufacturer and uses only public actor knowledge.
+organisation:
+  sectors: [aerospace, defense, manufacturing, critical infrastructure]
+  own_domains_variable: "${ORG_DOMAINS}"      # queries reference this, never a literal domain
+  crown_jewels: [engineering file shares, identity platform, email, OT/plant networks, supplier portal]
+
+# Techniques weighted by how often they appear in intrusions against this profile (1 = nice to have, 3 = must cover).
+priority_techniques:
+  T1566.001: 3
+  T1566.002: 3
+  T1078.004: 3
+  T1110.003: 3
+  T1557: 3
+  T1621: 2
+  T1114.003: 3
+  T1059.001: 3
+  T1218.011: 2
+  T1053.005: 2
+  T1105: 3
+  T1071.004: 2
+  T1219: 2
+  T1003.001: 3
+  T1021.001: 2
+  T1486: 3
+  T1490: 2
+  T1190: 2
+  T1133: 2
+  T1562.001: 2
+  T1070.001: 1
+  T1098.003: 2
+  T1136.002: 1
+  T1567.002: 2
+  T1048.003: 1
+  T1491.002: 1
+
+# Public actor profiles (MITRE ATT&CK group pages). Each actor's techniques feed the gap report.
+actors:
+  - name: MuddyWater
+    attack_group: G0069
+    techniques: [T1566.001, T1059.001, T1105, T1219, T1021.001, T1053.005, T1027]
+  - name: OilRig
+    attack_group: G0049
+    techniques: [T1566.002, T1071.004, T1059.001, T1003.001, T1078, T1105]
+  - name: APT33
+    attack_group: G0064
+    techniques: [T1110.003, T1566.002, T1053.005, T1059.001, T1105]
+  - name: Agrius
+    attack_group: G1030
+    techniques: [T1486, T1190, T1078, T1021.002, T1490]
+  - name: Magic Hound (Charming Kitten)
+    attack_group: G0059
+    techniques: [T1566.002, T1557, T1621, T1114.003, T1078.004, T1598.003]
+  - name: Lazarus Group
+    attack_group: G0032
+    techniques: [T1204.002, T1218.011, T1105, T1027, T1036.005, T1547.001]

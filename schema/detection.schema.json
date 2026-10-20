@@ -1,0 +1,300 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/itamarmalkaz/detection-engineering-cookbook/schema/detection.schema.json",
+  "title": "Detection / hunt content",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "kind",
+    "platform",
+    "status",
+    "severity",
+    "description",
+    "attack",
+    "query",
+    "data_sources",
+    "author",
+    "created"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^(DET|HUNT)-[0-9]{4}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 100
+    },
+    "kind": {
+      "enum": [
+        "detection",
+        "hunt"
+      ]
+    },
+    "platform": {
+      "enum": [
+        "xsiam-xql",
+        "sentinel-kql",
+        "defender-kql"
+      ]
+    },
+    "status": {
+      "enum": [
+        "draft",
+        "qa",
+        "prod",
+        "retired"
+      ]
+    },
+    "severity": {
+      "enum": [
+        "informational",
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ]
+    },
+    "description": {
+      "type": "string",
+      "minLength": 40
+    },
+    "author": {
+      "type": "string"
+    },
+    "created": {
+      "type": "string",
+      "format": "date"
+    },
+    "updated": {
+      "type": "string",
+      "format": "date"
+    },
+    "attack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tactics",
+        "techniques"
+      ],
+      "properties": {
+        "tactics": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^TA[0-9]{4}$"
+          }
+        },
+        "techniques": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^T[0-9]{4}(\\.[0-9]{3})?$"
+          }
+        }
+      }
+    },
+    "data_sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "query": {
+      "type": "string",
+      "minLength": 20
+    },
+    "schedule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "frequency": {
+          "type": "string",
+          "pattern": "^[0-9]+[mhd]$"
+        },
+        "lookback": {
+          "type": "string",
+          "pattern": "^[0-9]+[mhd]$"
+        }
+      }
+    },
+    "false_positives": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "response": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "playbook": {
+          "type": "string"
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "triage": {
+          "type": "string"
+        }
+      }
+    },
+    "references": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uri"
+      }
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "validation": {
+      "description": "How CI proves the logic. 'unit' = the portable logic block is run against the sample events below. 'manual' = aggregate/statistical query that cannot be unit-tested; a reason is required and the rule cannot be promoted past qa without a documented lab run.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method"
+      ],
+      "properties": {
+        "method": {
+          "enum": [
+            "unit",
+            "manual"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "lab_run": {
+          "type": "string",
+          "format": "date"
+        }
+      }
+    },
+    "logic": {
+      "description": "Portable, engine-independent predicate mirroring the query (Sigma-style). Evaluated by tools/evaluate.py in CI.",
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "tests": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "event",
+          "expect"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "event": {
+            "type": "object"
+          },
+          "expect": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "simulation": {
+      "description": "How to trigger the detection safely (BAS scenario or atomic test) so coverage is proven, not assumed.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "atomic": {
+          "type": "string"
+        },
+        "bas_scenario": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "validation"
+        ],
+        "properties": {
+          "validation": {
+            "properties": {
+              "method": {
+                "const": "unit"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "logic",
+          "tests"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "validation"
+        ],
+        "properties": {
+          "validation": {
+            "properties": {
+              "method": {
+                "const": "manual"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "validation": {
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "detection"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "validation",
+          "schedule",
+          "response"
+        ]
+      }
+    }
+  ]
+}

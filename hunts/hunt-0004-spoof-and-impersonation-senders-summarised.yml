@@ -1,0 +1,29 @@
+id: HUNT-0004
+name: Spoof and impersonation senders, summarised
+kind: hunt
+platform: defender-kql
+status: prod
+severity: informational
+author: itamarmalkaz
+created: '2026-10-20'
+description: >-
+  Spoof / impersonation verdicts over 30 days grouped by sender IP, from-address and display name, with counts of
+  subjects and recipients. Turns hundreds of single detections into a short list of sender infrastructures to block
+  at the gateway and to raise with partners whose DMARC is not aligned.
+attack:
+  tactics: [TA0001]
+  techniques: [T1566.002]
+data_sources:
+  - EmailEvents
+query: |
+  let own = dynamic([${ORG_DOMAINS}]);
+  EmailEvents
+  | where Timestamp > ago(30d)
+      and (DetectionMethods has "spoof" or DetectionMethods has "impersonation")
+      and SenderFromDomain !in (own)
+  | project Timestamp, EmailDirection, SenderFromAddress, SenderDisplayName, SenderMailFromAddress, SenderIPv4,
+            RecipientEmailAddress, Subject, ThreatNames, DetectionMethods, NetworkMessageId, ReportId
+  | summarize TotalEmails = count(), DistinctSubjects = dcount(Subject), DistinctRecipients = dcount(RecipientEmailAddress),
+              FirstSeen = min(Timestamp), LastSeen = max(Timestamp) by SenderIPv4, SenderFromAddress, SenderDisplayName
+  | sort by TotalEmails desc
+tags: [email, spoof, campaign]

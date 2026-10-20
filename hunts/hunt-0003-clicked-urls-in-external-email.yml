@@ -1,0 +1,34 @@
+id: HUNT-0003
+name: Clicked URLs in external email
+kind: hunt
+platform: defender-kql
+status: prod
+severity: informational
+author: itamarmalkaz
+created: '2026-10-20'
+description: >-
+  URL clicks that safe-links did not block, joined to the delivered message, for senders outside the organisation.
+  Own domains come from the profile variable ${ORG_DOMAINS} so the query is portable. The click is the moment an
+  email incident starts; this hunt finds the ones the mail verdict missed.
+attack:
+  tactics: [TA0002, TA0001]
+  techniques: [T1204.001, T1566.002]
+data_sources:
+  - UrlClickEvents
+  - EmailEvents
+query: |
+  let own = dynamic([${ORG_DOMAINS}]);
+  let Timeframe = 30d;
+  let EmailInformation = EmailEvents
+      | where Timestamp > ago(Timeframe)
+      | where UrlCount > 0
+      | where SenderFromDomain !in (own)
+      | project Timestamp, NetworkMessageId, SenderMailFromAddress, SenderFromAddress, SenderDisplayName, ThreatNames;
+  EmailInformation
+  | join (UrlClickEvents
+      | where ActionType != "ClickBlocked"
+      | where Workload == "Email"
+      | project Timestamp, Url, IPAddress, NetworkMessageId, AccountUpn
+  ) on NetworkMessageId
+  | sort by Timestamp desc
+tags: [email, click]

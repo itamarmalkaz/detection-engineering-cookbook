@@ -1,0 +1,32 @@
+id: HUNT-0002
+name: Post-delivery verdicts without quarantine
+kind: hunt
+platform: defender-kql
+status: prod
+severity: informational
+author: itamarmalkaz
+created: '2026-10-20'
+description: >-
+  Messages re-classified after delivery (zero-hour purge events) whose action did not end in Quarantine: the purge
+  failed, the user already moved the mail, or the mailbox is on-prem. Joined back to the original delivery so the
+  sender and subject are on the row. Candidates for a scheduled detection once the false-positive shape is known.
+attack:
+  tactics: [TA0001]
+  techniques: [T1566.001, T1566.002]
+data_sources:
+  - EmailPostDeliveryEvents
+  - EmailEvents
+query: |
+  let Timeframe = 5d;
+  let EmailInformation = EmailEvents
+      | where Timestamp > ago(Timeframe)
+      | where DeliveryAction != "Blocked"
+      | project Timestamp, NetworkMessageId, SenderMailFromAddress, SenderFromAddress, SenderDisplayName, ThreatNames;
+  EmailInformation
+  | join (EmailPostDeliveryEvents
+      | where DeliveryLocation != "Quarantine"
+      | where ThreatTypes != ""
+      | project Timestamp, NetworkMessageId, ActionType, ActionTrigger, ActionResult, DeliveryLocation, ThreatTypes, DetectionMethods
+  ) on NetworkMessageId
+  | sort by Timestamp desc
+tags: [email, mdo, zap]
