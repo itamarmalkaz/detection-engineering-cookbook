@@ -15,7 +15,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: {python-version: "3.12", cache: pip}
+        with:
+          python-version: "3.12"
+          cache: pip
       - run: pip install -r requirements.txt
       - name: Validate every detection and hunt
         run: python tools/validate.py
@@ -28,9 +30,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with: {ref: ${{ github.head_ref || github.ref_name }}}
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
       - uses: actions/setup-python@v5
-        with: {python-version: "3.12", cache: pip}
+        with:
+          python-version: "3.12"
+          cache: pip
       - run: pip install -r requirements.txt
       - name: Regenerate coverage, gaps and the Navigator layer
         run: python tools/coverage.py
@@ -38,7 +43,9 @@ jobs:
         run: python tools/sentinel_deploy.py render
       - name: Publish as workflow artefact
         uses: actions/upload-artifact@v4
-        with: {name: attack-coverage, path: coverage/}
+        with:
+          name: attack-coverage
+          path: coverage/
       - name: Commit regenerated artefacts (main only)
         if: github.event_name == 'push'
         run: |

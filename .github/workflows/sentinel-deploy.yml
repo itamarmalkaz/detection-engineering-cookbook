@@ -4,6 +4,8 @@ name: sentinel-deploy
 # Pull requests get a what-if (no change). A push to main deploys, but only inside the `sentinel-prod`
 # environment, which requires a reviewer approval in the repository settings. Secrets: an OIDC federated
 # credential for the deploying identity (no client secret stored in GitHub).
+# Both jobs are skipped until the repository variable SENTINEL_WORKSPACE is set, so the pipeline is green
+# before any Azure wiring exists.
 on:
   pull_request:
     paths: [detections/**, infra/sentinel/**, tools/sentinel_deploy.py]
@@ -21,12 +23,13 @@ env:
 
 jobs:
   what-if:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && vars.SENTINEL_WORKSPACE != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: {python-version: "3.12"}
+        with:
+          python-version: "3.12"
       - run: pip install -r requirements.txt && python tools/sentinel_deploy.py render
       - uses: azure/login@v2
         with:
@@ -36,13 +39,14 @@ jobs:
       - run: az deployment group what-if -g "$RG" -f infra/sentinel/main.bicep -p @infra/sentinel/rules.generated.json -p workspaceName="$WS"
 
   deploy:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && vars.SENTINEL_WORKSPACE != ''
     environment: sentinel-prod
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: {python-version: "3.12"}
+        with:
+          python-version: "3.12"
       - run: pip install -r requirements.txt && python tools/sentinel_deploy.py render
       - uses: azure/login@v2
         with:
